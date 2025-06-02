@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Pacientes Registrados</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #aaa;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Pacientes Registrados</h2>
+  <table id="tablaPacientes">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Edad</th>
+        <th>Sexo</th>
+        <th>Fecha Consulta</th>
+        <th>Temperatura</th>
+        <th>Pulso</th>
+        <th>Doctor</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <br>
+  <a href="/">Volver</a>
+
+  <script>
+    async function cargarPacientes() {
+      try {
+        const res = await fetch('/pacientes');
+        const pacientes = await res.json();
+
+        const tbody = document.querySelector('#tablaPacientes tbody');
+        tbody.innerHTML = '';
+
+        pacientes.forEach(paciente => {
+          const fila = document.createElement('tr');
+          fila.innerHTML = `
+            <td>${paciente.nombre}</td>
+            <td>${paciente.edad}</td>
+            <td>${paciente.sexo}</td>
+            <td>${paciente.fecha_consul}</td>
+            <td>${paciente.temperatura}</td>
+            <td>${paciente.pulso}</td>
+            <td>${paciente.nombre_doctor}</td>
+          `;
+          tbody.appendChild(fila);
+        });
+      } catch (err) {
+        console.error('Error cargando pacientes:', err);
+      }
+    }
+
+    window.onload = cargarPacientes;
+  </script>
+</body>
+</html>
