@@ -100,6 +100,12 @@ app.get('/logout', (req, res) => {
   res.redirect('/login.html');
 });
 
+const path = require('path');
+
+app.get('/verpacientes', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'verpacientes.html'));
+});
+
 
 app.get('/pacientes', (req, res) => {
   const doctor_id = req.session.userId;
