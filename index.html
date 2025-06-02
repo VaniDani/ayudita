@@ -9,11 +9,18 @@
             font-size: 1.2em;
             margin-top: 10px;
         }
-        .imagen-izquierda, .imagen-derecha {
-            margin: 20px;
+        table {
+            margin-top: 30px;
+            border-collapse: collapse;
+            width: 100%;
         }
-        .contenedor-botones {
-            margin: 20px 0;
+        th, td {
+            padding: 8px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
         }
     </style>
 </head>
@@ -40,40 +47,45 @@
         </form>
     </div>
 
-    <div class="contenedor-botones">
-        <button type="submit" id="saveMeasurement">Guardar Medición</button>
-    </div>
-
     <div id="datos">
         <p><strong>Temperatura:</strong> <span id="temp">--</span> °C</p>
         <p><strong>Oximetro:</strong> <span id="dist">--</span> %</p>
     </div>
 
-    <div id="div_comando"></div>
-    <div id="div_grafica"></div>
-
-    <img src="https://cdn-icons-png.flaticon.com/512/7404/7404165.png" alt="Oximetro" width="300" class="imagen-izquierda">
-
     <div class="contenedor-botones">
         <button id="startMeasurement">Iniciar Medición</button>
         <button id="stopMeasurement">Detener Medición</button>
+        <button id="saveMeasurement">Guardar Medición</button>
     </div>
 
+    <img src="https://cdn-icons-png.flaticon.com/512/7404/7404165.png" alt="Oximetro" width="300" class="imagen-izquierda">
     <img src="https://cdn-icons-png.flaticon.com/512/2996/2996114.png" alt="Termometro" width="300" class="imagen-derecha">
 
     <a href="/logout">Cerrar Sesión</a>
 
+    <!-- Tabla de pacientes -->
+    <h3>Pacientes Registrados</h3>
+    <table id="tablaPacientes">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Edad</th>
+                <th>Sexo</th>
+                <th>Fecha Consulta</th>
+                <th>Temperatura</th>
+                <th>Pulso</th>
+                <th>Doctor</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
     <script>
         const socket = io();
-        let ultimaTemperatura = null;
-        let ultimoPulso = null;
 
         socket.on("desde_esp32", function(data) {
             try {
                 const parsed = JSON.parse(data);
-                ultimaTemperatura = parsed.temperatura;
-                ultimoPulso = parsed.distancia;
-
                 document.getElementById("temp").innerText = parsed.temperatura.toFixed(2);
                 document.getElementById("dist").innerText = parsed.distancia.toFixed(2);
             } catch (err) {
@@ -84,9 +96,6 @@
         socket.on("retransmision_esp32", function(data) {
             try {
                 const parsed = (typeof data === "string") ? JSON.parse(data) : data;
-                ultimaTemperatura = parsed.temperatura;
-                ultimoPulso = parsed.distancia;
-
                 document.getElementById("temp").innerText = parsed.temperatura.toFixed(2);
                 document.getElementById("dist").innerText = parsed.distancia.toFixed(2);
             } catch (err) {
@@ -94,41 +103,75 @@
             }
         });
 
-        document.getElementById("saveMeasurement").addEventListener("click", async function () {
+        // Guardar mediciones
+        document.getElementById("saveMeasurement").addEventListener("click", async () => {
             const nombre = document.getElementById("name").value;
-            const edad = parseInt(document.getElementById("age").value);
-            const fecha_consul = document.getElementById("date").value;
+            const edad = document.getElementById("age").value;
+            const fecha = document.getElementById("date").value;
             const sexo = document.getElementById("gender").value;
 
-            if (!ultimaTemperatura || !ultimoPulso) {
-                alert("Esperando datos del sensor...");
+            let temperatura = parseFloat(document.getElementById("temp").innerText);
+            let pulso = parseFloat(document.getElementById("dist").innerText);
+
+            if (isNaN(temperatura)) temperatura = 0.0;
+            if (isNaN(pulso)) pulso = 0;
+
+            if (!nombre || !edad || !fecha || !sexo) {
+                alert("Por favor completa todos los campos del paciente.");
                 return;
             }
 
-            const datos = {
-                nombre,
-                edad,
-                fecha_consul,
-                sexo,
-                temperatura: ultimaTemperatura,
-                pulso: Math.round(ultimoPulso)
-            };
+            const paciente = { nombre, edad, fecha_consul: fecha, sexo, temperatura, pulso };
 
-            const res = await fetch('/guardar-medicion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(datos)
-            });
+            try {
+                const response = await fetch('/api/pacientes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(paciente)
+                });
 
-            const result = await res.json();
-
-            if (result.success) {
-                alert("Medición guardada correctamente.");
-                document.getElementById("patientForm").reset();
-            } else {
-                alert("Error al guardar la medición.");
+                if (response.ok) {
+                    alert("Paciente y mediciones guardadas con éxito");
+                    document.getElementById("patientForm").reset();
+                    cargarPacientes(); // recarga tabla
+                } else {
+                    const error = await response.text();
+                    alert("Error al guardar: " + error);
+                }
+            } catch (err) {
+                alert("Error de conexión con el servidor");
+                console.error(err);
             }
         });
+
+        // Cargar pacientes al inicio
+        async function cargarPacientes() {
+            try {
+                const res = await fetch('/pacientes');
+                const pacientes = await res.json();
+
+                const tbody = document.querySelector('#tablaPacientes tbody');
+                tbody.innerHTML = '';
+
+                pacientes.forEach(paciente => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${paciente.nombre}</td>
+                        <td>${paciente.edad}</td>
+                        <td>${paciente.sexo}</td>
+                        <td>${paciente.fecha_consul}</td>
+                        <td>${paciente.temperatura}</td>
+                        <td>${paciente.pulso}</td>
+                        <td>${paciente.nombre_doctor}</td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            } catch (error) {
+                console.error('Error cargando pacientes:', error);
+            }
+        }
+
+        window.onload = cargarPacientes;
     </script>
 </body>
 </html>
